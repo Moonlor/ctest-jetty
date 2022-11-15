@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.text.MessageFormat;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collection;
@@ -48,6 +49,10 @@ import javax.servlet.ServletSecurityElement;
 import javax.servlet.SingleThreadModel;
 import javax.servlet.UnavailableException;
 import javax.servlet.http.HttpServletResponse;
+import javax.xml.XMLConstants;
+import javax.xml.parsers.DocumentBuilder;
+import javax.xml.parsers.DocumentBuilderFactory;
+import javax.xml.parsers.ParserConfigurationException;
 
 import org.eclipse.jetty.security.IdentityService;
 import org.eclipse.jetty.security.RunAsToken;
@@ -63,6 +68,12 @@ import org.eclipse.jetty.util.component.Dumpable;
 import org.eclipse.jetty.util.component.DumpableCollection;
 import org.eclipse.jetty.util.log.Log;
 import org.eclipse.jetty.util.log.Logger;
+import org.eclipse.jetty.util.resource.Resource;
+import org.w3c.dom.Document;
+import org.w3c.dom.Element;
+import org.w3c.dom.Node;
+import org.w3c.dom.NodeList;
+import org.xml.sax.SAXException;
 
 /**
  * Servlet Instance and Context Holder.
@@ -361,6 +372,48 @@ public class ServletHolder extends Holder<Servlet> implements UserIdentity.Scope
             }
             else
                 LOG.warn("Bad jsp-file {} conversion to classname in holder {}", _forcedPath, getName());
+        }
+
+        //ctest
+        Resource ctestConf = Resource.newSystemResource("ctest.xml");
+        DocumentBuilderFactory dbf = DocumentBuilderFactory.newInstance();
+
+        try 
+        {
+            dbf.setFeature(XMLConstants.FEATURE_SECURE_PROCESSING, true);
+            DocumentBuilder db = dbf.newDocumentBuilder();
+            Document doc = db.parse(ctestConf.getFile());
+  
+            doc.getDocumentElement().normalize();
+  
+            NodeList list = doc.getElementsByTagName("property");
+  
+            for (int temp = 0; temp < list.getLength(); temp++) 
+            {
+  
+                Node node = list.item(temp);
+  
+                if (node.getNodeType() == Node.ELEMENT_NODE)
+                {
+  
+                    Element element = (Element)node;
+                    // String id = element.getAttribute("id");
+  
+                    // get text
+                    String key = element.getElementsByTagName("name").item(0).getTextContent();
+                    String value = element.getElementsByTagName("value").item(0).getTextContent();
+                    LOG.warn("[CTEST][INJECT-PARAM]", (MessageFormat.format("{0} -> {1}", key, value)));
+                    
+                    setInitParameter(key, value);
+
+                }
+            }
+  
+        } 
+        catch (ParserConfigurationException | SAXException | IOException e) 
+        {
+            e.printStackTrace();
+            throw e;
         }
 
         //check servlet has a class (ie is not a preliminary registration). If preliminary, fail startup.
